@@ -1,0 +1,13 @@
+﻿[MainMenu1]
+Coordinates=74,1,81,36
+
+[SpeedButtonSetting]
+Coordinates=75,10,129,36
+
+[SpeedButtonExport]
+Coordinates=10,78,126,36
+
+[]
+Coordinates=10,10,55,58
+Visible=True
+

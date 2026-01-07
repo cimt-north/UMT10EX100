@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2025/09/15 09:49:42.000.160,=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2025/09/15 10:01:07.000.399,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Unit1.pas=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit1.pas</Transaction>
+    <Transaction>2025/09/15 10:01:07.000.400,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Unit1.dfm=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit1.dfm</Transaction>
+    <Transaction>2025/09/15 10:05:14.000.217,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Project1.dproj=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Project1.dproj</Transaction>
+    <Transaction>2025/09/16 07:59:51.000.671,=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit2.pas</Transaction>
+    <Transaction>2025/09/16 08:00:05.000.025,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit2.pas=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\SettingForm.pas</Transaction>
+    <Transaction>2025/09/16 08:00:05.000.025,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit2.dfm=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\SettingForm.dfm</Transaction>
+    <Transaction>2025/09/16 09:10:16.000.995,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit1.pas=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\UnitMain.pas</Transaction>
+    <Transaction>2025/09/16 09:10:16.000.996,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit1.dfm=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\UnitMain.dfm</Transaction>
+    <Transaction>2025/09/16 09:26:40.000.116,=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit2.pas</Transaction>
+    <Transaction>2025/09/16 09:26:50.000.352,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit2.dfm=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Exporter.dfm</Transaction>
+    <Transaction>2025/09/16 09:26:50.000.352,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit2.pas=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Exporter.pas</Transaction>
+    <Transaction>2025/09/16 09:33:20.000.953,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Exporter.pas=</Transaction>
+    <Transaction>2025/09/16 09:33:35.000.985,=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit1.pas</Transaction>
+    <Transaction>2025/09/16 09:33:43.000.850,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Unit1.pas=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Exporter.pas</Transaction>
+    <Transaction>2025/09/16 13:09:28.000.392,C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Project1.dproj=C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\UMT10EX101.dproj</Transaction>
+  </Transactions>
+	<ProjectSortOrder AutoSort="0" SortType="0">
+    <File Path="Exporter.pas"/>
+    <File Path="SettingForm.pas"/>
+    <File Path="SettingForm.dfm"/>
+    <File Path="UnitMain.pas"/>
+    <File Path="UnitMain.dfm"/>
+  </ProjectSortOrder>
+</BorlandProject>

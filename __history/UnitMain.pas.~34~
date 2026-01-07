@@ -1,0 +1,366 @@
+﻿unit UnitMain;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.Buttons, Vcl.ExtCtrls,
+  Vcl.Menus, Vcl.ComCtrls, System.ImageList, Vcl.ImgList, Vcl.StdCtrls,
+  Vcl.ToolWin, ShellAPI;
+
+type
+  TUMT10EX100 = class(TForm)
+    MainMenu1: TMainMenu;
+    SpeedButtonSetting: TSpeedButton;
+    SpeedButtonExport: TSpeedButton;
+    CoolBar1: TCoolBar;
+    ToolBar1: TToolBar;
+    labTitle: TLabel;
+    panTitle: TPanel;
+    Label1: TLabel;
+    ImageList1: TImageList;
+    ProgressBar1: TProgressBar;
+    StatusBar1: TStatusBar;
+    Memo1: TMemo;
+    SpeedButtonImport: TSpeedButton;
+    procedure FormCreate(Sender: TObject);
+    procedure SpeedButtonSettingClick(Sender: TObject);
+    procedure SpeedButtonExportClick(Sender: TObject);
+    procedure SpeedButtonImportClick(Sender: TObject);
+    procedure ButtonImport;
+  private
+    FIniPath: string;
+    // Auto-run support
+    FAutoRun: Boolean;
+    AutoTimer: TTimer;
+
+    procedure EnsureDefaultIni;
+    procedure UpdateIMPIni(const FIniPath, IMPFile, SectionName, OutputKey: string; AMemo: TMemo);
+    procedure DoAutoRun(Sender: TObject);
+  public
+  end;
+
+var
+  UMT10EX100: TUMT10EX100;
+
+implementation
+
+{$R *.dfm}
+
+uses
+  SettingForm, Exporter, IniFiles, System.IOUtils;
+
+{------------------ Utility ------------------}
+
+procedure TUMT10EX100.UpdateIMPIni(const FIniPath, IMPFile, SectionName, OutputKey: string; AMemo: TMemo);
+var
+  IniExport, IniIMP: TMemIniFile;
+  ExportPath, FolderPath, FileNameOnly: string;
+begin
+  // Read from export_config.ini
+  IniExport := TMemIniFile.Create(FIniPath, TEncoding.UTF8);
+  try
+    ExportPath := IniExport.ReadString(OutputKey, 'Path', '');
+  finally
+    IniExport.Free;
+  end;
+
+  if ExportPath = '' then
+  begin
+    if Assigned(AMemo) then
+      AMemo.Lines.Add('ERROR: ' + OutputKey + '.Path not found in export_config.ini');
+    Exit;
+  end;
+
+  FolderPath   := IncludeTrailingPathDelimiter(ExtractFileDir(ExportPath));
+  FileNameOnly := ExtractFileName(ExportPath);
+
+  if not FileExists(IMPFile) then
+  begin
+    if Assigned(AMemo) then
+      AMemo.Lines.Add('ERROR: ' + IMPFile + ' not found.');
+    Exit;
+  end;
+
+  IniIMP := TMemIniFile.Create(IMPFile, TEncoding.UTF8);
+  try
+    IniIMP.WriteString(SectionName, 'CsvFileFolderPath', FolderPath);
+    IniIMP.WriteString(SectionName, 'CsvFileNM', FileNameOnly);
+    IniIMP.UpdateFile;
+  finally
+    IniIMP.Free;
+  end;
+
+  if Assigned(AMemo) then
+  begin
+    AMemo.Lines.Add('Updated ' + ExtractFileName(IMPFile));
+    AMemo.Lines.Add('  CsvFileFolderPath = ' + FolderPath);
+    AMemo.Lines.Add('  CsvFileNM = ' + FileNameOnly);
+  end;
+end;
+
+{------------------ Form Create ------------------}
+
+procedure TUMT10EX100.FormCreate(Sender: TObject);
+var
+  CustomBlue: TColor;
+  VerInfoSize, VerValueSize, Dummy: DWORD;
+  VerInfo: Pointer;
+  VerValue: PVSFixedFileInfo;
+  V1, V2, V3, V4: Word;
+  VersionString, FileNameString: string;
+  IniFile: TIniFile;
+  filename, DirectDBName, User: string;
+begin
+  Caption := 'Display';
+
+  Memo1.Clear;
+
+  SpeedButtonSetting.Caption := 'Setting';
+  SpeedButtonExport.Caption  := 'Export';
+  SpeedButtonImport.Caption  := 'Import';
+
+  // export_config.ini next to exe
+  FIniPath := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'export_config.ini';
+  EnsureDefaultIni;
+
+  CustomBlue := rgb(194, 209, 254);
+  Self.Color := CustomBlue;
+
+  StatusBar1.Panels.Clear;
+
+  // Panel: exe name
+  FileNameString := ExtractFileName(Application.ExeName);
+  with StatusBar1.Panels.Add do
+  begin
+    Width := 95;
+    Text := FileNameString;
+  end;
+
+  // Panel: version
+  VerInfoSize := GetFileVersionInfoSize(PChar(ParamStr(0)), Dummy);
+  if VerInfoSize > 0 then
+  begin
+    GetMem(VerInfo, VerInfoSize);
+    try
+      if GetFileVersionInfo(PChar(ParamStr(0)), 0, VerInfoSize, VerInfo) then
+      begin
+        if VerQueryValue(VerInfo, '\', Pointer(VerValue), VerValueSize) then
+        begin
+          V1 := HiWord(VerValue^.dwFileVersionMS);
+          V2 := LoWord(VerValue^.dwFileVersionMS);
+          V3 := HiWord(VerValue^.dwFileVersionLS);
+          V4 := LoWord(VerValue^.dwFileVersionLS);
+          VersionString := Format('%d.%d.%d.%d', [V1, V2, V3, V4]);
+        end;
+      end;
+    finally
+      FreeMem(VerInfo, VerInfoSize);
+    end;
+  end
+  else
+    VersionString := 'Version not found';
+
+  with StatusBar1.Panels.Add do
+  begin
+    Width := 70;
+    Text := VersionString;
+  end;
+
+  // Panel: DB name from Setup\SetUp.ini
+  filename := ExtractFilePath(Application.ExeName) + 'Setup\SetUp.Ini';
+  if FileExists(filename) then
+  begin
+    IniFile := TIniFile.Create(filename);
+    try
+      DirectDBName := IniFile.ReadString('Setting', 'DIRECTDBNAME', '');
+      User := IniFile.ReadString('Setting', 'USERNAME', '');
+      with StatusBar1.Panels.Add do
+      begin
+        Width := 300;
+        Text := DirectDBName + ':' + User;
+      end;
+    finally
+      IniFile.Free;
+    end;
+  end;
+
+  // Panel: time
+  with StatusBar1.Panels.Add do
+  begin
+    Width := 270;
+  end;
+
+  // ===== Auto-run mode =====
+  FAutoRun := FindCmdLineSwitch('AUTO', True);
+  if (not FAutoRun) and (ParamCount >= 1) and SameText(ParamStr(1), 'AUTO') then
+    FAutoRun := True;
+
+  if FAutoRun then
+  begin
+    Memo1.Lines.Add('AUTO mode detected. Export -> Import -> Exit');
+    AutoTimer := TTimer.Create(Self);
+    AutoTimer.Interval := 300;
+    AutoTimer.OnTimer  := DoAutoRun;
+    AutoTimer.Enabled  := True;
+  end;
+end;
+
+{------------------ Default INI ------------------}
+
+procedure TUMT10EX100.EnsureDefaultIni;
+var
+  Ini: TMemIniFile;
+  DateSuffix: string;
+  SetupDir: string;
+begin
+  if FileExists(FIniPath) then Exit;
+
+  DateSuffix := FormatDateTime('yyyymmdd', Date);
+  SetupDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'Setup\';
+  if not TDirectory.Exists(SetupDir) then
+    TDirectory.CreateDirectory(SetupDir);
+
+  Ini := TMemIniFile.Create(FIniPath, TEncoding.UTF8);
+  try
+    Ini.WriteString('Input','File','C:\Data\DE_NewOrderReport 250912.xlsx');
+    Ini.WriteString('Input','Sheet','Sheet1');
+
+    Ini.WriteString('Output1','Path','C:\Export\NewOrder_Job' + '.csv');
+    Ini.WriteString('Output2','Path','C:\Export\NewOrder_Part' + '.csv');
+    Ini.WriteString('Output3','Path','C:\Export\NewOrder_Process' + '.csv');
+
+    Ini.WriteString('Options','ExportFormat','CSV');
+    Ini.UpdateFile;
+  finally
+    Ini.Free;
+  end;
+end;
+
+{------------------ Buttons ------------------}
+
+procedure TUMT10EX100.SpeedButtonSettingClick(Sender: TObject);
+begin
+  if TSettingF.Execute(FIniPath) then
+    Application.MessageBox('Settings saved.', 'Info', MB_OK or MB_ICONINFORMATION);
+end;
+
+procedure TUMT10EX100.SpeedButtonExportClick(Sender: TObject);
+var
+  Ini: TMemIniFile;
+  p1, p2, p3, outDir: string;
+begin
+  try
+    Memo1.Clear;
+    ProgressBar1.Position := 0;
+    ProgressBar1.Visible := True;
+
+    Ini := TMemIniFile.Create(FIniPath, TEncoding.UTF8);
+    try
+      p1 := Ini.ReadString('Output1','Path','');
+      p2 := Ini.ReadString('Output2','Path','');
+      p3 := Ini.ReadString('Output3','Path','');
+
+      if p1 <> '' then begin outDir := ExtractFileDir(p1); if not TDirectory.Exists(outDir) then TDirectory.CreateDirectory(outDir); end;
+      if p2 <> '' then begin outDir := ExtractFileDir(p2); if not TDirectory.Exists(outDir) then TDirectory.CreateDirectory(outDir); end;
+      if p3 <> '' then begin outDir := ExtractFileDir(p3); if not TDirectory.Exists(outDir) then TDirectory.CreateDirectory(outDir); end;
+    finally
+      Ini.Free;
+    end;
+    try
+      Exporter.ExportSplit(FIniPath, ProgressBar1, Memo1);
+      ButtonImport;
+      if not FAutoRun then
+        Application.MessageBox('Export completed.', 'Success', MB_OK or MB_ICONINFORMATION);
+    finally
+      ProgressBar1.Position := 0;
+    end;
+  except
+    on E: Exception do
+    begin
+      Memo1.Lines.Add('ERROR: ' + E.Message);
+      if not FAutoRun then
+        Application.MessageBox(PChar('ERROR: ' + E.Message), 'Export Failed', MB_OK or MB_ICONERROR);
+    end;
+  end;
+end;
+
+procedure TUMT10EX100.SpeedButtonImportClick(Sender: TObject);
+begin
+   ButtonImport;
+end;
+
+
+
+procedure TUMT10EX100.ButtonImport;
+var
+  SetupDir, ExePath: string;
+begin
+  Memo1.Lines.Add('Updating IMP INI files...');
+  SetupDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'Setup\';
+
+  // Update INI files
+  UpdateIMPIni(FIniPath, SetupDir + 'IMP1100.ini', 'TfrmProIMP1110', 'Output1', Memo1);
+  UpdateIMPIni(FIniPath, SetupDir + 'IMP1300.ini', 'TFrmImp1310',    'Output2', Memo1);
+  UpdateIMPIni(FIniPath, SetupDir + 'IMP1400.ini', 'TfrmProIMP1410', 'Output3', Memo1);
+
+  Memo1.Lines.Add('INI files updated. Launching IMP programs...');
+
+  // Run IMP1100.exe
+ // ExePath := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName)) + 'IMP1100.exe';
+ // if FileExists(ExePath) then
+ //   ShellExecute(0, 'open', PChar(ExePath), nil, nil, SW_SHOWNORMAL)
+ // else
+ //   Memo1.Lines.Add('Not found: ' + ExePath);
+
+  // Run IMP1300.exe
+ // ExePath := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName)) + 'IMP1300.exe';
+ // if FileExists(ExePath) then
+  //  ShellExecute(0, 'open', PChar(ExePath), nil, nil, SW_SHOWNORMAL)
+  // else
+  //  Memo1.Lines.Add('Not found: ' + ExePath);
+
+  // Run IMP1400.exe
+  // ExePath := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName)) + 'IMP1400.exe';
+  // if FileExists(ExePath) then
+  //  ShellExecute(0, 'open', PChar(ExePath), nil, nil, SW_SHOWNORMAL)
+  // else
+   // Memo1.Lines.Add('Not found: ' + ExePath);
+
+ // if not FAutoRun then
+  //  Application.MessageBox('All IMP INI files updated and programs launched.',
+  //    'Info', MB_OK or MB_ICONINFORMATION);
+end;
+
+{------------------ AutoRun ------------------}
+
+procedure TUMT10EX100.DoAutoRun(Sender: TObject);
+begin
+  AutoTimer.Enabled := False;
+
+  try
+    // 1) Export
+    try
+      SpeedButtonExportClick(nil);
+    except
+      on E: Exception do
+        Memo1.Lines.Add('AUTO: Export failed - ' + E.Message);
+    end;
+
+    // 2) Import
+    try
+      SpeedButtonImportClick(nil);
+    except
+      on E: Exception do
+        Memo1.Lines.Add('AUTO: Import failed - ' + E.Message);
+    end;
+
+  finally
+    Memo1.Lines.Add('AUTO: Done. Closing application...');
+    Application.ProcessMessages;
+    Application.Terminate;
+  end;
+end;
+
+end.
+

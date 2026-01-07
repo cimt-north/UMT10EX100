@@ -1,0 +1,2 @@
+[2025-12-24 15:55:02] JOB -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Job\NewOrder_Job.csv (header + 413 rows)
+[2025-12-24 15:55:04] PART -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Part\NewOrder_Part.csv (header + 413 rows)

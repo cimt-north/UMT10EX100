@@ -1,0 +1,254 @@
+﻿unit SettingForm;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Buttons,
+  IniFiles, System.IOUtils, Vcl.ExtCtrls, Vcl.FileCtrl, System.DateUtils, ShellAPI;
+
+type
+  // Output1 = Job (A..E), Output2 = Part (F..I), Output3 = Process (T..BY)
+  // ช่อง EditPath* จะเก็บ "ตำแหน่งโฟลเดอร์" เท่านั้น
+  TSettingF = class(TForm)
+    EditPathJob: TEdit;         // โฟลเดอร์ปลายทางของไฟล์ Job
+    EditPathPart: TEdit;        // โฟลเดอร์ปลายทางของไฟล์ Part
+    EditPathProcess: TEdit;     // โฟลเดอร์ปลายทางของไฟล์ Process
+    EditPathExcel: TEdit;       // ไฟล์ Excel ต้นทาง
+
+    ButtonPathExcel: TSpeedButton;
+    ButtonPathJob: TSpeedButton;
+    ButtonPathPart: TSpeedButton;
+    ButtonPathProcess: TSpeedButton;
+    ButtonOK: TSpeedButton;
+    ButtonCancel: TSpeedButton;
+
+    ImportFile: TLabel;
+    PathJob: TLabel;
+    PathPart: TLabel;
+    PathProcess: TLabel;
+
+    OpenDialog1: TOpenDialog;
+    panTitle: TPanel;
+    Label1: TLabel;
+    labTitle: TLabel;
+    SaveDialog1: TSaveDialog;
+    Panel1: TPanel;
+
+    procedure FormCreate(Sender: TObject);
+    procedure ButtonPathExcelClick(Sender: TObject);
+    procedure ButtonPathJobClick(Sender: TObject);
+    procedure ButtonPathPartClick(Sender: TObject);
+    procedure ButtonPathProcessClick(Sender: TObject);
+    procedure ButtonOKClick(Sender: TObject);
+    procedure ButtonCancelClick(Sender: TObject);
+  private
+    FIniPath: string;
+    procedure LoadFromIni;
+    procedure SaveToIni; // จะประกอบพาธเต็มโดยชื่อไฟล์บังคับ + วันที่
+    procedure EnsureDir(const ADir: string);
+    function BrowseForFolder(const Title: string; var OutDir: string): Boolean;
+    function ForcedFileName(const BaseName: string): string; // ใส่วันที่อัตโนมัติ + .csv
+  public
+    class function Execute(const AIniPath: string): Boolean;
+  end;
+
+var
+  SettingF: TSettingF;
+
+implementation
+
+{$R *.dfm}
+
+{========================= Helpers =========================}
+
+procedure TSettingF.EnsureDir(const ADir: string);
+begin
+  if (ADir <> '') and not TDirectory.Exists(ADir) then
+    TDirectory.CreateDirectory(ADir);
+end;
+
+function TSettingF.BrowseForFolder(const Title: string; var OutDir: string): Boolean;
+var
+  Dir: string;
+begin
+  Dir := OutDir;
+  // sdNewUI = UI ใหม่, sdNewFolder = สร้างโฟลเดอร์ได้
+  Result := SelectDirectory(Title, '', Dir, [sdNewUI, sdNewFolder]);
+  if Result then
+    // เก็บแบบไม่มี \ ท้าย (ตอน Combine จะจัดให้เอง)
+    OutDir := ExcludeTrailingPathDelimiter(Trim(Dir));
+end;
+
+function TSettingF.ForcedFileName(const BaseName: string): string;
+var
+  DateSuffix: string;
+begin
+  // yyyyMMdd เช่น 20250916 — บังคับเป็นไฟล์ .csv
+  DateSuffix := FormatDateTime('yyyymmdd', Date);
+  Result := Format('%s_%s.csv', [BaseName, DateSuffix]);
+end;
+
+{========================= Lifecycle =======================}
+
+class function TSettingF.Execute(const AIniPath: string): Boolean;
+var
+  F: TSettingF;
+begin
+  F := TSettingF.Create(nil);
+  try
+    F.FIniPath := AIniPath;
+    F.LoadFromIni;
+    Result := (F.ShowModal = mrOk);
+  finally
+    F.Free;
+  end;
+end;
+
+procedure TSettingF.FormCreate(Sender: TObject);
+begin
+  // Filter สำหรับเลือกไฟล์ Excel ต้นทาง
+  OpenDialog1.Filter := 'Excel (*.xlsx)|*.xlsx|All files (*.*)|*.*';
+
+  // ป้ายกำกับ
+  if Assigned(ImportFile)  then ImportFile.Caption  := 'Excel Path:';
+  if Assigned(PathJob)     then PathJob.Caption     := 'Job Folder Path :';
+  if Assigned(PathPart)    then PathPart.Caption    := 'Part Folder Path :';
+  if Assigned(PathProcess) then PathProcess.Caption := 'Process Folder Path :';
+end;
+
+{========================= INI I/O =========================}
+
+procedure TSettingF.LoadFromIni;
+var
+  Ini: TMemIniFile;
+  p: string;
+begin
+  if FIniPath = '' then
+    raise Exception.Create('Ini path is empty.');
+
+  Ini := TMemIniFile.Create(FIniPath, TEncoding.UTF8);
+  try
+    // Input
+    EditPathExcel.Text := Ini.ReadString('Input', 'File', '');
+    if Ini.ReadString('Input', 'Sheet', '') = '' then
+    begin
+      Ini.WriteString('Input', 'Sheet', 'Sheet1');
+      Ini.UpdateFile;
+    end;
+
+    // Output paths เดิมเป็น "พาธไฟล์เต็ม" → แสดงเฉพาะโฟลเดอร์ในช่อง Edit
+    p := Ini.ReadString('Output1', 'Path', '');
+    if p <> '' then EditPathJob.Text := ExtractFileDir(p) else EditPathJob.Text := '';
+
+    p := Ini.ReadString('Output2', 'Path', '');
+    if p <> '' then EditPathPart.Text := ExtractFileDir(p) else EditPathPart.Text := '';
+
+    p := Ini.ReadString('Output3', 'Path', '');
+    if p <> '' then EditPathProcess.Text := ExtractFileDir(p) else EditPathProcess.Text := '';
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure TSettingF.SaveToIni;
+var
+  Ini: TMemIniFile;
+  outJobDir, outPartDir, outProcDir: string;
+  fullJob, fullPart, fullProc: string;
+begin
+  Ini := TMemIniFile.Create(FIniPath, TEncoding.UTF8);
+  try
+    // Input
+    Ini.WriteString('Input', 'File', Trim(EditPathExcel.Text));
+    if Ini.ReadString('Input', 'Sheet', '') = '' then
+      Ini.WriteString('Input', 'Sheet', 'Sheet1');
+
+    // โฟลเดอร์ปลายทาง (ผู้ใช้กรอก/เลือก)
+    outJobDir  := Trim(EditPathJob.Text);
+    outPartDir := Trim(EditPathPart.Text);
+    outProcDir := Trim(EditPathProcess.Text);
+
+    // สร้างโฟลเดอร์หากยังไม่มี
+    if outJobDir  <> '' then EnsureDir(outJobDir);
+    if outPartDir <> '' then EnsureDir(outPartDir);
+    if outProcDir <> '' then EnsureDir(outProcDir);
+
+    // ประกอบ "พาธไฟล์เต็ม" ด้วยชื่อไฟล์บังคับ + วันที่ (yyyyMMdd) → .csv
+    if outJobDir  <> '' then
+      fullJob  := TPath.Combine(outJobDir,  ForcedFileName('NewOrder_Job'))
+    else
+      fullJob  := '';
+
+    if outPartDir <> '' then
+      fullPart := TPath.Combine(outPartDir, ForcedFileName('NewOrder_Part'))
+    else
+      fullPart := '';
+
+    if outProcDir <> '' then
+      fullProc := TPath.Combine(outProcDir, ForcedFileName('NewOrder_Process'))
+    else
+      fullProc := '';
+
+    // เขียนลง INI (Exporter จะอ่านจากคีย์นี้)
+    Ini.WriteString('Output1', 'Path', fullJob);      // เช่น: <JobFolder>\NewOrder_Job_20250916.csv
+    Ini.WriteString('Output2', 'Path', fullPart);     // เช่น: <PartFolder>\NewOrder_Part_20250916.csv
+    Ini.WriteString('Output3', 'Path', fullProc);     // เช่น: <ProcFolder>\NewOrder_Process_20250916.csv
+
+    // บังคับรูปแบบเป็น CSV (ถ้าอยาก configurable ค่อยย้ายไปหน้า Setting เพิ่มตัวเลือก)
+    Ini.WriteString('Options', 'ExportFormat', 'CSV');
+
+    Ini.UpdateFile;
+  finally
+    Ini.Free;
+  end;
+end;
+
+{========================= UI Events =======================}
+
+procedure TSettingF.ButtonPathExcelClick(Sender: TObject);
+begin
+  if OpenDialog1.Execute then
+    EditPathExcel.Text := OpenDialog1.FileName;
+end;
+
+procedure TSettingF.ButtonPathJobClick(Sender: TObject);
+var
+  dir: string;
+begin
+  dir := EditPathJob.Text;
+  if BrowseForFolder('เลือกโฟลเดอร์สำหรับ Job', dir) then
+    EditPathJob.Text := dir;
+end;
+
+procedure TSettingF.ButtonPathPartClick(Sender: TObject);
+var
+  dir: string;
+begin
+  dir := EditPathPart.Text;
+  if BrowseForFolder('เลือกโฟลเดอร์สำหรับ Part', dir) then
+    EditPathPart.Text := dir;
+end;
+
+procedure TSettingF.ButtonPathProcessClick(Sender: TObject);
+var
+  dir: string;
+begin
+  dir := EditPathProcess.Text;
+  if BrowseForFolder('เลือกโฟลเดอร์สำหรับ Process', dir) then
+    EditPathProcess.Text := dir;
+end;
+
+procedure TSettingF.ButtonOKClick(Sender: TObject);
+begin
+  SaveToIni;
+  ModalResult := mrOk;
+end;
+
+procedure TSettingF.ButtonCancelClick(Sender: TObject);
+begin
+  ModalResult := mrCancel;
+end;
+
+end.
+

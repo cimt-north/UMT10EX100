@@ -1,0 +1,457 @@
+﻿unit Exporter;
+
+interface
+
+uses
+  System.SysUtils, Vcl.ComCtrls, Vcl.StdCtrls;
+
+procedure ExportSplit(const IniPath: string; AProgress: TProgressBar; AMemo: TMemo = nil);
+
+implementation
+
+uses
+  System.Classes, System.Variants, System.IOUtils,
+  Winapi.ActiveX, Winapi.Windows, Winapi.Messages,
+  IniFiles, ComObj, System.DateUtils,
+  Vcl.Forms;
+
+const
+  // Source column ranges (from the original Excel)
+  COL_JOB_FIRST     = 1;   // A
+  COL_JOB_LAST      = 5;   // E
+  COL_PART_FIRST    = 6;   // F
+  COL_PART_LAST     = 9;   // I
+  COL_PROCESS_FIRST = 20;  // T
+  COL_PROCESS_LAST  = 77;  // BY   (จะคำนวณจำนวนโปรเซสจริงจากช่วงนี้)
+
+{-------------------- Helpers --------------------}
+
+procedure MemoStep(AMemo: TMemo; const S: string);
+begin
+  if Assigned(AMemo) then
+  begin
+    AMemo.Lines.Add(FormatDateTime('hh:nn:ss', Now) + '  ' + S);
+    AMemo.SelStart := Length(AMemo.Text);
+    AMemo.Perform(EM_SCROLLCARET, 0, 0);
+    Application.ProcessMessages;  // refresh UI
+  end;
+end;
+
+function CsvEscape(const S: string): string;
+var
+  NeedsQuote: Boolean;
+  R: string;
+begin
+  NeedsQuote := (Pos(',', S) > 0) or (Pos('"', S) > 0) or
+                (Pos(#13, S) > 0) or (Pos(#10, S) > 0);
+  R := StringReplace(S, '"', '""', [rfReplaceAll]);
+  if NeedsQuote then
+    Result := '"' + R + '"'
+  else
+    Result := R;
+end;
+
+function CsvJoin(const Fields: TArray<string>): string;
+var
+  i: Integer;
+begin
+  Result := '';
+  for i := 0 to High(Fields) do
+  begin
+    if i > 0 then Result := Result + ',';
+    Result := Result + CsvEscape(Fields[i]);
+  end;
+end;
+
+function CsvLineFromRow(const Sheet: OleVariant; const Row, FirstCol, LastCol: Integer): string;
+var
+  V: OleVariant;
+  C, Cols: Integer;
+  Line: string;
+begin
+  Line := '';
+  Cols := LastCol - FirstCol + 1;
+
+  V := Sheet.Range[Sheet.Cells[Row, FirstCol], Sheet.Cells[Row, LastCol]].Value;
+
+  if VarIsArray(V) then
+  begin
+    for C := 1 to Cols do
+    begin
+      if C > 1 then Line := Line + ',';
+      Line := Line + CsvEscape(VarToStr(V[1, C]));
+    end;
+  end
+  else
+    Line := CsvEscape(VarToStr(V));
+
+  Result := Line;
+end;
+
+function CsvLineFromRowCols(const Sheet: OleVariant; const Row: Integer; const ColIdx: array of Integer): string;
+var
+  i: Integer;
+  V: OleVariant;
+begin
+  Result := '';
+  for i := Low(ColIdx) to High(ColIdx) do
+  begin
+    V := Sheet.Cells[Row, ColIdx[i]].Value;
+    if i > Low(ColIdx) then
+      Result := Result + ',';
+    Result := Result + CsvEscape(VarToStr(V));
+  end;
+end;
+
+{-------------------- CSV Writers (Job/Part) --------------------}
+
+procedure SaveCSVWithCustomHeader(const SrcSheet: OleVariant;
+  FirstCol, LastCol: Integer; const Path: string;
+  const Title: string; const LogPath: string;
+  AProgress: TProgressBar; AMemo: TMemo;
+  const HeaderFields: TArray<string>);
+var
+  R: Integer;
+  SL: TStringList;
+  Total, Done: Integer;
+  LastRow: Integer;
+  StartRow, EndRow: Integer;
+  WroteDataCount: Integer;
+begin
+  MemoStep(AMemo, 'Start ' + Title + ' → ' + Path);
+
+  SL := TStringList.Create;
+  try
+    SL.Add(CsvJoin(HeaderFields));
+
+    LastRow  := SrcSheet.UsedRange.Row + SrcSheet.UsedRange.Rows.Count - 1;
+    StartRow := 3;
+    EndRow   := LastRow;
+
+    if EndRow >= StartRow then
+      Total := 1 + (EndRow - StartRow + 1)
+    else
+      Total := 1;
+
+    Done := 0;
+    if Assigned(AProgress) then
+    begin
+      AProgress.Position := 0;
+      AProgress.Max := Total;
+    end;
+
+    Inc(Done); // header
+    if Assigned(AProgress) then AProgress.Position := Done;
+
+    WroteDataCount := 0;
+    if EndRow >= StartRow then
+      for R := StartRow to EndRow do
+      begin
+        SL.Add(CsvLineFromRow(SrcSheet, R, FirstCol, LastCol));
+        Inc(WroteDataCount);
+        Inc(Done);
+        if Assigned(AProgress) then AProgress.Position := Done;
+        if (R mod 50 = 0) then
+          MemoStep(AMemo, Format('%s processing row %d...', [Title, R]));
+      end;
+
+    ForceDirectories(ExtractFileDir(Path));
+    SL.SaveToFile(Path, TEncoding.UTF8);
+
+    TFile.AppendAllText(LogPath,
+      Format('[%s] %s -> %s (header + %d rows)',
+        [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), Title, Path, WroteDataCount])
+      + sLineBreak, TEncoding.UTF8);
+
+    MemoStep(AMemo, Format('%s completed (%d rows written)', [Title, WroteDataCount]));
+  finally
+    SL.Free;
+  end;
+end;
+
+procedure SaveCSVWithCustomHeaderByCols(const SrcSheet: OleVariant;
+  const ColIndices: array of Integer; const Path: string;
+  const Title: string; const LogPath: string;
+  AProgress: TProgressBar; AMemo: TMemo;
+  const HeaderFields: TArray<string>);
+var
+  R: Integer;
+  SL: TStringList;
+  Total, Done: Integer;
+  LastRow: Integer;
+  StartRow, EndRow: Integer;
+  WroteDataCount: Integer;
+begin
+  MemoStep(AMemo, 'Start ' + Title + ' → ' + Path);
+
+  SL := TStringList.Create;
+  try
+    SL.Add(CsvJoin(HeaderFields));
+
+    LastRow  := SrcSheet.UsedRange.Row + SrcSheet.UsedRange.Rows.Count - 1;
+    StartRow := 3;
+    EndRow   := LastRow;
+
+    if EndRow >= StartRow then
+      Total := 1 + (EndRow - StartRow + 1)
+    else
+      Total := 1;
+
+    Done := 0;
+    if Assigned(AProgress) then
+    begin
+      AProgress.Position := 0;
+      AProgress.Max := Total;
+    end;
+
+    Inc(Done);
+    if Assigned(AProgress) then AProgress.Position := Done;
+
+    WroteDataCount := 0;
+    if EndRow >= StartRow then
+      for R := StartRow to EndRow do
+      begin
+        SL.Add(CsvLineFromRowCols(SrcSheet, R, ColIndices));
+        Inc(WroteDataCount);
+        Inc(Done);
+        if Assigned(AProgress) then AProgress.Position := Done;
+        if (R mod 50 = 0) then
+          MemoStep(AMemo, Format('%s processing row %d...', [Title, R]));
+      end;
+
+    ForceDirectories(ExtractFileDir(Path));
+    SL.SaveToFile(Path, TEncoding.UTF8);
+
+    TFile.AppendAllText(LogPath,
+      Format('[%s] %s -> %s (header + %d rows)',
+        [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), Title, Path, WroteDataCount])
+      + sLineBreak, TEncoding.UTF8);
+
+    MemoStep(AMemo, Format('%s completed (%d rows written)', [Title, WroteDataCount]));
+  finally
+    SL.Free;
+  end;
+end;
+
+{-------------------- NEW: PROCESS (Long format) --------------------}
+
+procedure SaveProcessAsLongCSV(const SrcSheet: OleVariant;
+  const Path: string; const LogPath: string; AProgress: TProgressBar; AMemo: TMemo);
+var
+  SL: TStringList;
+  LastRow, StartRow, EndRow: Integer;
+  Total, Done, R: Integer;
+  MfgNo, PartFig, ProcName, SetVal, MaVal: string;
+  // T = process only, force set/ma = 0
+  FirstOnlyProcCol: Integer;
+  // U..BY = triplets (process,set,ma)
+  TripletStartCol, TripletEndCol, MaxTriples, k: Integer;
+  ProcCol, SetCol, MaCol: Integer;
+begin
+  MemoStep(AMemo, 'Start PROCESS (long; T uses 0/0, U..BY uses sheet set/ma) → ' + Path);
+
+  SL := TStringList.Create;
+  try
+    // Header
+    SL.Add(CsvJoin(TArray<string>.Create('Mfg.No.','Part figure','process','set','ma')));
+
+    LastRow  := SrcSheet.UsedRange.Row + SrcSheet.UsedRange.Rows.Count - 1;
+    StartRow := 3;
+    EndRow   := LastRow;
+
+    // layout
+    FirstOnlyProcCol := COL_PROCESS_FIRST;       // T
+    TripletStartCol  := COL_PROCESS_FIRST + 1;   // U
+    TripletEndCol    := COL_PROCESS_LAST;        // BY
+
+    if TripletEndCol >= TripletStartCol then
+      MaxTriples := (TripletEndCol - TripletStartCol + 1) div 3
+    else
+      MaxTriples := 0;
+
+    // progress estimate (header + rows*(1 for T + MaxTriples))
+    if EndRow >= StartRow then
+      Total := 1 + (EndRow - StartRow + 1) * (1 + MaxTriples)
+    else
+      Total := 1;
+
+    Done := 0;
+    if Assigned(AProgress) then
+    begin
+      AProgress.Position := 0;
+      AProgress.Max := Total;
+    end;
+
+    Inc(Done); // header
+    if Assigned(AProgress) then AProgress.Position := Done;
+
+    if EndRow >= StartRow then
+      for R := StartRow to EndRow do
+      begin
+        // Mfg.No. (C), Part figure (F)
+        MfgNo   := VarToStr(SrcSheet.Cells[R, 3].Value);
+        PartFig := VarToStr(SrcSheet.Cells[R, 6].Value);
+
+        // (1) Column T: process only → set=0, ma=0 (write even if blank process? ถ้าต้องการข้าม ให้เช็ค Trim(ProcName) <> '')
+        ProcName := VarToStr(SrcSheet.Cells[R, FirstOnlyProcCol].Value);
+        SL.Add(CsvJoin(TArray<string>.Create(MfgNo, PartFig, ProcName, '0', '0')));
+        Inc(Done);
+        if Assigned(AProgress) then AProgress.Position := Done;
+
+        // (2) Triplets U..BY: read real set/ma from sheet
+        for k := 0 to MaxTriples-1 do
+        begin
+          ProcCol := TripletStartCol + k*3; // process
+          SetCol  := ProcCol + 1;           // set
+          MaCol   := ProcCol + 2;           // ma
+
+          ProcName := VarToStr(SrcSheet.Cells[R, ProcCol].Value);
+          SetVal   := VarToStr(SrcSheet.Cells[R, SetCol].Value);
+          MaVal    := VarToStr(SrcSheet.Cells[R, MaCol].Value);
+
+          // ถ้าต้องการ default เป็น '0' เมื่อว่าง:
+          if Trim(SetVal) = '' then SetVal := '0';
+          if Trim(MaVal)  = '' then MaVal  := '0';
+
+          // เขียนเฉพาะเมื่อมีชื่อ process จริง
+          if Trim(ProcName) <> '' then
+            SL.Add(CsvJoin(TArray<string>.Create(MfgNo, PartFig, ProcName, SetVal, MaVal)));
+
+          Inc(Done);
+          if Assigned(AProgress) then AProgress.Position := Done;
+        end;
+
+        if (R mod 50 = 0) then
+          MemoStep(AMemo, Format('PROCESS row %d...', [R]));
+      end;
+
+    ForceDirectories(ExtractFileDir(Path));
+    SL.SaveToFile(Path, TEncoding.UTF8);
+
+    TFile.AppendAllText(LogPath,
+      Format('[%s] PROCESS -> %s (rows=%d)',
+        [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), Path, SL.Count-1]) + sLineBreak,
+      TEncoding.UTF8);
+
+    MemoStep(AMemo, Format('PROCESS completed (%d data rows)', [SL.Count-1]));
+  finally
+    SL.Free;
+  end;
+end;
+
+
+
+
+{-------------------- Main --------------------}
+
+procedure ExportSplit(const IniPath: string; AProgress: TProgressBar; AMemo: TMemo = nil);
+var
+  Ini: TMemIniFile;
+  InputFile, SheetName: string;
+  OutJob, OutPart, OutProcess: string;
+  LogPath, LogDir: string;
+
+  Excel, WB, Sheet: OleVariant;
+
+  HeaderJob: TArray<string>;
+  HeaderPart: TArray<string>;
+begin
+  // headers
+  HeaderJob := TArray<string>.Create(
+    'CstmrCD','Cstmr.Name','Mfg.No.','RE','ProductName'
+  );
+
+  // PART: C + F..I  → [3,6,7,8,9]
+  HeaderPart := TArray<string>.Create(
+    'ColC','PartsName','Material','SizeRemarks','PartsQuantity'
+  );
+
+  MemoStep(AMemo, 'Reading INI...');
+
+  // read INI
+  Ini := TMemIniFile.Create(IniPath, TEncoding.UTF8);
+  try
+    InputFile   := Ini.ReadString('Input', 'File', '');
+    SheetName   := Ini.ReadString('Input', 'Sheet', 'Sheet1');
+    OutJob      := Ini.ReadString('Output1', 'Path', '');
+    OutPart     := Ini.ReadString('Output2', 'Path', '');
+    OutProcess  := Ini.ReadString('Output3', 'Path', '');
+
+    LogPath := Ini.ReadString('Options', 'LogPath', '');
+    if Trim(LogPath) = '' then
+    begin
+      LogDir :=  IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'LOG\';
+      if not TDirectory.Exists(LogDir) then
+        TDirectory.CreateDirectory(LogDir);
+      LogPath := TPath.Combine(LogDir, 'export_log_' + FormatDateTime('yyyymmdd', Now) + '.txt');
+    end;
+  finally
+    Ini.Free;
+  end;
+
+  if not FileExists(InputFile) then
+  begin
+    MemoStep(AMemo, 'ERROR: input file not found: ' + InputFile);
+    raise Exception.CreateFmt('Input file not found: %s', [InputFile]);
+  end;
+
+  // log start
+  TFile.AppendAllText(LogPath,
+    '============================================================' + sLineBreak +
+    'Start Export: ' + FormatDateTime('yyyy-mm-dd hh:nn:ss', Now) + sLineBreak +
+    'InputFile : ' + InputFile + sLineBreak +
+    'Sheet     : ' + SheetName + sLineBreak,
+    TEncoding.UTF8);
+
+  // excel ole
+  MemoStep(AMemo, 'Opening Excel...');
+  CoInitialize(nil);
+  try
+    Excel := CreateOleObject('Excel.Application');
+    Excel.Visible := False;
+
+    try
+      MemoStep(AMemo, 'Open workbook: ' + InputFile);
+      WB := Excel.Workbooks.Open(InputFile);
+      try
+        try
+          Sheet := WB.Worksheets[SheetName];
+          MemoStep(AMemo, 'Using sheet: ' + SheetName);
+        except
+          Sheet := WB.Worksheets[1];
+          MemoStep(AMemo, 'Sheet not found, using first sheet instead.');
+        end;
+
+        // ===== JOB: A..E =====
+        if OutJob <> '' then
+          SaveCSVWithCustomHeader(Sheet, COL_JOB_FIRST, COL_JOB_LAST,
+            OutJob, 'JOB', LogPath, AProgress, AMemo, HeaderJob);
+
+        // ===== PART: C + F..I =====
+        if OutPart <> '' then
+          SaveCSVWithCustomHeaderByCols(Sheet, [3,6,7,8,9],
+            OutPart, 'PART', LogPath, AProgress, AMemo, HeaderPart);
+
+        // ===== PROCESS: Long format (C, F, then triplets of T..BY) =====
+        if OutProcess <> '' then
+          SaveProcessAsLongCSV(Sheet, OutProcess, LogPath, AProgress, AMemo);
+
+        TFile.AppendAllText(LogPath,
+          Format('[%s] DONE', [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now)]) + sLineBreak,
+          TEncoding.UTF8);
+
+        MemoStep(AMemo, 'Export completed successfully.');
+      finally
+        WB.Close(False);
+      end;
+    finally
+      try Excel.Quit; except end;
+      Excel := Unassigned;
+    end;
+  finally
+    CoUninitialize;
+  end;
+end;
+
+end.
+

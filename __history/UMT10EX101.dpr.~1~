@@ -1,0 +1,17 @@
+program Project1;
+
+uses
+  Vcl.Forms,
+  UnitMain in 'UnitMain.pas' {UMT10EX100},
+  SettingForm in 'SettingForm.pas' {SettingF},
+  Exporter in 'Exporter.pas';
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+  Application.CreateForm(TUMT10EX100, UMT10EX100);
+  Application.CreateForm(TSettingF, SettingF);
+  Application.Run;
+end.

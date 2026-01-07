@@ -1,0 +1,237 @@
+﻿unit SettingForm;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Buttons,
+  System.IOUtils, IniFiles;
+
+type
+  // Form: ผู้ใช้เลือก "โฟลเดอร์" สำหรับ Job / Part / Process
+  // โปรแกรมจะบังคับชื่อไฟล์เองตอน SaveToIni
+  TSettingF = class(TForm)
+    EditPathExcel: TEdit;   // ไฟล์ Excel (full file path)
+    EditDirJob: TEdit;      // โฟลเดอร์สำหรับ Output1 (Job)
+    EditDirPart: TEdit;     // โฟลเดอร์สำหรับ Output2 (Part)
+    EditDirProcess: TEdit;  // โฟลเดอร์สำหรับ Output3 (Process)
+
+    BtnPickExcel: TSpeedButton;
+    BtnPickJob: TSpeedButton;
+    BtnPickPart: TSpeedButton;
+    BtnPickProcess: TSpeedButton;
+
+    BtnOK: TSpeedButton;
+    BtnCancel: TSpeedButton;
+
+    LabExcel: TLabel;
+    LabJob: TLabel;
+    LabPart: TLabel;
+    LabProcess: TLabel;
+
+    OpenDialog1: TOpenDialog;
+
+    procedure FormCreate(Sender: TObject);
+    procedure BtnPickExcelClick(Sender: TObject);
+    procedure BtnPickJobClick(Sender: TObject);
+    procedure BtnPickPartClick(Sender: TObject);
+    procedure BtnPickProcessClick(Sender: TObject);
+    procedure BtnOKClick(Sender: TObject);
+    procedure BtnCancelClick(Sender: TObject);
+  private
+    FIniPath: string;
+    function PickFolder(out ADir: string): Boolean;
+    procedure EnsureDir(const ADir: string);
+
+    procedure LoadFromIni;
+    procedure SaveToIni;
+    function DateSuffix: string;
+  public
+    // เรียกใช้แบบโมดัล: ส่งพาธไฟล์ INI เข้ามา
+    class function Execute(const AIniPath: string): Boolean;
+  end;
+
+var
+  SettingF: TSettingF;
+
+implementation
+
+{$R *.dfm}
+
+uses
+  FileCtrl, System.DateUtils;
+
+{========================= Utilities =========================}
+
+function TSettingF.PickFolder(out ADir: string): Boolean;
+var
+  Dir: string;
+begin
+  Dir := '';
+  // SelectDirectory(Title, Root, outDir, Options)
+  // sdNewUI = UI ใหม่, sdNewFolder = สร้างโฟลเดอร์ได้
+  Result := SelectDirectory('Select a folder', '', Dir, [sdNewUI, sdNewFolder]);
+  if Result then
+  begin
+    ADir := IncludeTrailingPathDelimiter(Trim(Dir));
+  end;
+end;
+
+procedure TSettingF.EnsureDir(const ADir: string);
+begin
+  if (ADir <> '') and not TDirectory.Exists(ADir) then
+    TDirectory.CreateDirectory(ADir);
+end;
+
+function TSettingF.DateSuffix: string;
+begin
+  Result := FormatDateTime('yyyymmdd', Date);
+end;
+
+{========================= Lifecycle =========================}
+
+class function TSettingF.Execute(const AIniPath: string): Boolean;
+var
+  F: TSettingF;
+begin
+  F := TSettingF.Create(nil);
+  try
+    F.FIniPath := AIniPath;
+    F.LoadFromIni;
+    Result := (F.ShowModal = mrOk);
+  finally
+    F.Free;
+  end;
+end;
+
+procedure TSettingF.FormCreate(Sender: TObject);
+begin
+  // Dialog filters
+  OpenDialog1.Filter := 'Excel (*.xlsx)|*.xlsx|All files (*.*)|*.*';
+
+  // Labels (ปรับตามต้องการ)
+  if Assigned(LabExcel)   then LabExcel.Caption   := 'Excel file:';
+  if Assigned(LabJob)     then LabJob.Caption     := 'Job folder:';
+  if Assigned(LabPart)    then LabPart.Caption    := 'Part folder:';
+  if Assigned(LabProcess) then LabProcess.Caption := 'Process folder:';
+end;
+
+{========================= INI I/O =========================}
+
+procedure TSettingF.LoadFromIni;
+var
+  Ini: TMemIniFile;
+  Out1, Out2, Out3: string;
+begin
+  if FIniPath = '' then
+    raise Exception.Create('Ini path is empty.');
+
+  Ini := TMemIniFile.Create(FIniPath, TEncoding.UTF8);
+  try
+    // Input file
+    EditPathExcel.Text := Ini.ReadString('Input', 'File', '');
+    if Ini.ReadString('Input', 'Sheet', '') = '' then
+    begin
+      Ini.WriteString('Input', 'Sheet', 'Sheet1');
+      Ini.UpdateFile;
+    end;
+
+    // Read full output paths, but show only "folders" in the edits
+    Out1 := Ini.ReadString('Output1', 'Path', '');
+    Out2 := Ini.ReadString('Output2', 'Path', '');
+    Out3 := Ini.ReadString('Output3', 'Path', '');
+
+    if Out1 <> '' then EditDirJob.Text     := IncludeTrailingPathDelimiter(ExtractFileDir(Out1));
+    if Out2 <> '' then EditDirPart.Text    := IncludeTrailingPathDelimiter(ExtractFileDir(Out2));
+    if Out3 <> '' then EditDirProcess.Text := IncludeTrailingPathDelimiter(ExtractFileDir(Out3));
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure TSettingF.SaveToIni;
+var
+  Ini: TMemIniFile;
+  DirJob, DirPart, DirProcess: string;
+  Out1, Out2, Out3: string;
+begin
+  // Compose final file names (program-controlled)
+  DirJob     := IncludeTrailingPathDelimiter(Trim(EditDirJob.Text));
+  DirPart    := IncludeTrailingPathDelimiter(Trim(EditDirPart.Text));
+  DirProcess := IncludeTrailingPathDelimiter(Trim(EditDirProcess.Text));
+
+  // Make sure folders exist
+  EnsureDir(DirJob);
+  EnsureDir(DirPart);
+  EnsureDir(DirProcess);
+
+  Out1 := DirJob     + 'NewOrder_Job_'     + DateSuffix + '.csv';
+  Out2 := DirPart    + 'NewOrder_Part_'    + DateSuffix + '.csv';
+  Out3 := DirProcess + 'NewOrder_Process_' + DateSuffix + '.csv';
+
+  Ini := TMemIniFile.Create(FIniPath, TEncoding.UTF8);
+  try
+    // Input
+    Ini.WriteString('Input', 'File', Trim(EditPathExcel.Text));
+    if Ini.ReadString('Input', 'Sheet', '') = '' then
+      Ini.WriteString('Input', 'Sheet', 'Sheet1');
+
+    // Output: write full file paths (folder+forced filename)
+    Ini.WriteString('Output1', 'Path', Out1);
+    Ini.WriteString('Output2', 'Path', Out2);
+    Ini.WriteString('Output3', 'Path', Out3);
+
+    // Force CSV (you can remove or make this configurable if needed)
+    Ini.WriteString('Options', 'ExportFormat', 'CSV');
+
+    Ini.UpdateFile;
+  finally
+    Ini.Free;
+  end;
+end;
+
+{========================= UI Events =======================}
+
+procedure TSettingF.BtnPickExcelClick(Sender: TObject);
+begin
+  if OpenDialog1.Execute then
+    EditPathExcel.Text := OpenDialog1.FileName;
+end;
+
+procedure TSettingF.BtnPickJobClick(Sender: TObject);
+var
+  Dir: string;
+begin
+  if PickFolder(Dir) then
+    EditDirJob.Text := Dir;
+end;
+
+procedure TSettingF.BtnPickPartClick(Sender: TObject);
+var
+  Dir: string;
+begin
+  if PickFolder(Dir) then
+    EditDirPart.Text := Dir;
+end;
+
+procedure TSettingF.BtnPickProcessClick(Sender: TObject);
+var
+  Dir: string;
+begin
+  if PickFolder(Dir) then
+    EditDirProcess.Text := Dir;
+end;
+
+procedure TSettingF.BtnOKClick(Sender: TObject);
+begin
+  SaveToIni;
+  ModalResult := mrOk;
+end;
+
+procedure TSettingF.BtnCancelClick(Sender: TObject);
+begin
+  ModalResult := mrCancel;
+end;
+
+end.
+

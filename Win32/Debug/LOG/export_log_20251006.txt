@@ -1,0 +1,44 @@
+============================================================
+Start Export: 2025-10-06 11:12:36
+InputFile : C:\Users\CIMT-North\Downloads\DE_NewOrderReport 250912.xlsx
+Sheet     : Sheet1
+[2025-10-06 11:12:45] JOB -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Job\NewOrder_Job_20251006.csv (header + 413 rows)
+[2025-10-06 11:13:01] PART -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Part\NewOrder_Part_20251006.csv (header + 413 rows)
+============================================================
+Start Export: 2025-10-06 11:48:54
+InputFile : C:\Users\CIMT-North\Downloads\DE_NewOrderReport 250912.xlsx
+Sheet     : Sheet1
+[2025-10-06 11:48:56] JOB -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Job\NewOrder_Job_20251006.csv (header + 413 rows)
+[2025-10-06 11:48:58] PART -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Part\NewOrder_Part_20251006.csv (header + 413 rows)
+[2025-10-06 11:49:23] PROCESS -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Process\NewOrder_Process_20251006.csv (rows=3161)
+[2025-10-06 11:49:23] DONE
+============================================================
+Start Export: 2025-10-06 11:51:55
+InputFile : C:\Users\CIMT-North\Downloads\DE_NewOrderReport 250912.xlsx
+Sheet     : Sheet1
+[2025-10-06 11:51:56] JOB -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Job\NewOrder_Job_20251006.csv (header + 413 rows)
+[2025-10-06 11:51:58] PART -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Part\NewOrder_Part_20251006.csv (header + 413 rows)
+============================================================
+Start Export: 2025-10-06 12:08:00
+InputFile : C:\Users\CIMT-North\Downloads\DE_NewOrderReport 250912.xlsx
+Sheet     : Sheet1
+[2025-10-06 12:08:02] JOB -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Job\NewOrder_Job.csv (header + 413 rows)
+[2025-10-06 12:08:04] PART -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Part\NewOrder_Part.csv (header + 413 rows)
+[2025-10-06 12:08:28] PROCESS -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Process\NewOrder_Process.csv (rows=3161)
+[2025-10-06 12:08:28] DONE
+============================================================
+Start Export: 2025-10-06 14:50:35
+InputFile : C:\Users\CIMT-North\Downloads\DE_NewOrderReport 250912.xlsx
+Sheet     : Sheet1
+[2025-10-06 14:50:44] JOB -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Job\NewOrder_Job.csv (header + 413 rows)
+[2025-10-06 14:50:59] PART -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Part\NewOrder_Part.csv (header + 413 rows)
+[2025-10-06 14:53:03] PROCESS -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Process\NewOrder_Process.csv (rows=3161)
+[2025-10-06 14:53:03] DONE
+============================================================
+Start Export: 2025-10-06 15:30:07
+InputFile : C:\Users\CIMT-North\Downloads\DE_NewOrderReport 250912.xlsx
+Sheet     : Sheet1
+[2025-10-06 15:30:19] JOB -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Job\NewOrder_Job.csv (header + 413 rows)
+[2025-10-06 15:30:31] PART -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Part\NewOrder_Part.csv (header + 413 rows)
+[2025-10-06 15:32:18] PROCESS -> C:\Users\CIMT-North\OneDrive\ドキュメント\Embarcadero\Studio\Projects\Umetoku\Win32\Debug\Process\NewOrder_Process.csv (rows=3160)
+[2025-10-06 15:32:18] DONE
