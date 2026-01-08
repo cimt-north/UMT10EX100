@@ -25,6 +25,7 @@ object UMT10EX100: TUMT10EX100
         MinHeight = 70
         Width = 671
       end>
+    ExplicitWidth = 667
     object ToolBar1: TToolBar
       Left = 11
       Top = 0
@@ -78,6 +79,8 @@ object UMT10EX100: TUMT10EX100
     Color = 16706018
     ParentBackground = False
     TabOrder = 1
+    ExplicitWidth = 667
+    ExplicitHeight = 268
     DesignSize = (
       677
       300)
@@ -124,6 +127,8 @@ object UMT10EX100: TUMT10EX100
       Lines.Strings = (
         'Memo1')
       TabOrder = 0
+      ExplicitWidth = 665
+      ExplicitHeight = 220
     end
   end
   object ProgressBar1: TProgressBar
@@ -133,6 +138,8 @@ object UMT10EX100: TUMT10EX100
     Height = 16
     Align = alBottom
     TabOrder = 2
+    ExplicitTop = 318
+    ExplicitWidth = 667
   end
   object StatusBar1: TStatusBar
     Left = 0
@@ -140,6 +147,8 @@ object UMT10EX100: TUMT10EX100
     Width = 677
     Height = 23
     Panels = <>
+    ExplicitTop = 334
+    ExplicitWidth = 667
   end
   object MainMenu1: TMainMenu
     Left = 424

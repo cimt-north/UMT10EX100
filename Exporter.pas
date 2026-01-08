@@ -20,12 +20,12 @@ const
   COL_JOB_LAST      = 5;   // E
   COL_PART_FIRST    = 6;   // F
   COL_PART_LAST     = 9;   // I
-  COL_PROCESS_FIRST = 20;  // T
-  COL_PROCESS_LAST  = 77;  // BY
+  COL_PROCESS_FIRST = 18;  // R
+  COL_PROCESS_LAST  = 75;  // BW
 
-  COL_M             = 13;  // M
+  COL_M             = 11;  // M
   COL_F             = 6;   // F
-  COL_O             = 15;  // O (StartDate)
+  COL_O             = 13;  // O (StartDate)
 
 {-------------------- Helpers --------------------}
 
@@ -234,7 +234,6 @@ begin
   Ini := TMemIniFile.Create(IniPath, TEncoding.UTF8);
   try
     InputFile := Ini.ReadString('Input','File','');
-    SheetName := 'ピックアップ';
     OutJob := Ini.ReadString('Output1','Path','');
     OutPart := Ini.ReadString('Output2','Path','');
     OutProcess := Ini.ReadString('Output3','Path','');
@@ -258,8 +257,10 @@ begin
     Excel.Visible := False;
     WB := Excel.Workbooks.Open(InputFile);
     try
-      Sheet := WB.Worksheets[SheetName];
-      MemoStep(AMemo,'Using sheet: '+SheetName);
+      Sheet := WB.Worksheets[1];
+      SheetName := Sheet.Name;
+
+      MemoStep(AMemo,'Using 1st Sheet: '+SheetName);
 
       // ===== JOB =====
       if OutJob <> '' then
