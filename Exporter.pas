@@ -23,9 +23,9 @@ const
   COL_PROCESS_FIRST = 18;  // R
   COL_PROCESS_LAST  = 75;  // BW
 
-  COL_M             = 11;  // M
+  COL_M             = 11;  // K
   COL_F             = 6;   // F
-  COL_O             = 13;  // O (StartDate)
+  COL_O             = 13;  // M (StartDate)
 
 {-------------------- Helpers --------------------}
 
@@ -83,17 +83,20 @@ end;
 
 {-------------------- CSV Writers --------------------}
 
+// ✅ เพิ่ม Parameter "AppendRunNo" เพื่อเลือกว่าจะต่อท้ายเลข 4 หลักหรือไม่
 procedure SaveCSVWithCustomHeaderByCols(const SrcSheet: OleVariant;
   const ColIndices: array of Integer; const Path: string;
   const Title: string; const LogPath: string;
   AProgress: TProgressBar; AMemo: TMemo;
-  const HeaderFields: TArray<string>);
+  const HeaderFields: TArray<string>;
+  AppendRunNo: Boolean = False);
 var
   R: Integer;
   SL: TStringList;
   Total, Done: Integer;
   LastRow, StartRow, EndRow: Integer;
   WroteDataCount: Integer;
+  RowData: string;
 begin
   MemoStep(AMemo, 'Start ' + Title + ' → ' + Path);
   SL := TStringList.Create;
@@ -123,7 +126,14 @@ begin
     if EndRow >= StartRow then
       for R := StartRow to EndRow do
       begin
-        SL.Add(CsvLineFromRowCols(SrcSheet, R, ColIndices));
+        // ดึงข้อมูลปกติมาก่อน
+        RowData := CsvLineFromRowCols(SrcSheet, R, ColIndices);
+
+        // ✅ ถ้าเปิดใช้งาน AppendRunNo (เช่น ไฟล์ PART) ให้คำนวณเลขใน RAM แล้วต่อท้ายเลย
+        if AppendRunNo then
+          RowData := RowData + ',' + CsvEscape(Format('%.4d', [R - StartRow + 1]));
+
+        SL.Add(RowData);
         Inc(WroteDataCount);
         Inc(Done);
         if Assigned(AProgress) then AProgress.Position := Done;
@@ -134,10 +144,11 @@ begin
     ForceDirectories(ExtractFileDir(Path));
     SL.SaveToFile(Path, TEncoding.UTF8);
 
-    TFile.AppendAllText(LogPath,
-      Format('[%s] %s -> %s (header + %d rows)',
-        [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), Title, Path, WroteDataCount])
-      + sLineBreak, TEncoding.UTF8);
+    if Trim(LogPath) <> '' then
+      TFile.AppendAllText(LogPath,
+        Format('[%s] %s -> %s (header + %d rows)',
+          [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), Title, Path, WroteDataCount])
+        + sLineBreak, TEncoding.UTF8);
 
     MemoStep(AMemo, Format('%s completed (%d rows written)', [Title, WroteDataCount]));
   finally
@@ -153,14 +164,14 @@ var
   SL: TStringList;
   LastRow, StartRow, EndRow: Integer;
   Total, Done, R: Integer;
-  MfgNo, PartFig, ProcName, SetVal, MaVal: string;
+  MfgNo, PartFig, ProcName, SetVal, MaVal, RunVal: string;
   FirstOnlyProcCol, TripletStartCol, TripletEndCol, MaxTriples, k: Integer;
   ProcCol, SetCol, MaCol: Integer;
 begin
   MemoStep(AMemo, 'Start PROCESS → ' + Path);
   SL := TStringList.Create;
   try
-    SL.Add(CsvJoin(TArray<string>.Create('Mfg.No.','Part figure','process','set','ma')));
+    SL.Add(CsvJoin(TArray<string>.Create('Mfg.No.','Part figure','process','set','ma','RUNNO')));
     LastRow := SrcSheet.UsedRange.Row + SrcSheet.UsedRange.Rows.Count - 1;
     StartRow := 3; EndRow := LastRow;
     FirstOnlyProcCol := COL_PROCESS_FIRST;
@@ -187,9 +198,13 @@ begin
     begin
       MfgNo   := VarToStr(SrcSheet.Cells[R, COL_M].Value);
       PartFig := VarToStr(SrcSheet.Cells[R, COL_F].Value);
+
+      // ✅ คำนวณ RUNNO 4 หลักใน RAM ทันทีโดยอิงจากบรรทัด R
+      RunVal  := Format('%.4d', [R - StartRow + 1]);
+
       ProcName := VarToStr(SrcSheet.Cells[R, FirstOnlyProcCol].Value);
       if Trim(ProcName) <> '' then
-        SL.Add(CsvJoin(TArray<string>.Create(MfgNo, PartFig, ProcName, '0', '0')));
+        SL.Add(CsvJoin(TArray<string>.Create(MfgNo, PartFig, ProcName, '0', '0', RunVal)));
 
       for k := 0 to MaxTriples-1 do
       begin
@@ -202,7 +217,7 @@ begin
         if Trim(SetVal) = '' then SetVal := '0';
         if Trim(MaVal)  = '' then MaVal  := '0';
         if Trim(ProcName) <> '' then
-          SL.Add(CsvJoin(TArray<string>.Create(MfgNo, PartFig, ProcName, SetVal, MaVal)));
+          SL.Add(CsvJoin(TArray<string>.Create(MfgNo, PartFig, ProcName, SetVal, MaVal, RunVal)));
       end;
     end;
 
@@ -229,7 +244,8 @@ var
   SDate: string;
 begin
   HeaderJob := TArray<string>.Create('CstmrCD','Cstmr.Name','Mfg.No.','RE','ProductName');
-  HeaderPart := TArray<string>.Create('Mfg.No.','PartsName','Material','SizeRemarks','PartsQuantity');
+  // เพิ่ม RUNNO ท้าย Header สำหรับ PART
+  HeaderPart := TArray<string>.Create('Mfg.No.','PartsName','Material','SizeRemarks','PartsQuantity','RUNNO');
 
   Ini := TMemIniFile.Create(IniPath, TEncoding.UTF8);
   try
@@ -255,6 +271,7 @@ begin
   try
     Excel := CreateOleObject('Excel.Application');
     Excel.Visible := False;
+    Excel.DisplayAlerts := False;
     WB := Excel.Workbooks.Open(InputFile);
     try
       Sheet := WB.Worksheets[1];
@@ -262,12 +279,14 @@ begin
 
       MemoStep(AMemo,'Using 1st Sheet: '+SheetName);
 
-      // ===== JOB =====
+      // ❌ ตัดส่วนที่เขียนลง Excel (Column CA) ทิ้งไปเลย โปรแกรมจะเร็วขึ้นและไม่พัง!
+
+      // ===== JOB (ไม่มีการต่อท้าย RUNNO) =====
       if OutJob <> '' then
       begin
-        SaveCSVWithCustomHeaderByCols(Sheet,[1,2,COL_M,4,5],OutJob,'JOB',LogPath,AProgress,AMemo,HeaderJob);
+        // ส่งค่า False ไว้ท้ายสุดเพื่อบอกว่าไม่ต้องรัน RUNNO
+        SaveCSVWithCustomHeaderByCols(Sheet, [1,2,COL_M,4,5], OutJob, 'JOB', LogPath, AProgress, AMemo, HeaderJob, False);
 
-        // ✅ Read StartDate from column O and +3 days
         SL := TStringList.Create;
         try
           SL.LoadFromFile(OutJob,TEncoding.UTF8);
@@ -294,14 +313,14 @@ begin
         finally
           SL.Free;
         end;
-        MemoStep(AMemo,'Added StartDate (column O +3 days) to JOB file');
+        MemoStep(AMemo,'Added StartDate (column M +3 days) to JOB file');
       end;
 
-      // ===== PART =====
+      // ===== PART (สั่งให้เติม RUNNO ต่อท้ายด้วยการส่ง True) =====
       if OutPart <> '' then
-        SaveCSVWithCustomHeaderByCols(Sheet,[COL_M,6,7,8,9],OutPart,'PART',LogPath,AProgress,AMemo,HeaderPart);
+        SaveCSVWithCustomHeaderByCols(Sheet, [COL_M,6,7,8,9], OutPart, 'PART', LogPath, AProgress, AMemo, HeaderPart, True);
 
-      // ===== PROCESS =====
+      // ===== PROCESS (คำนวณ RUNNO ใน RAM ในฟังก์ชันเลย) =====
       if OutProcess <> '' then
         SaveProcessAsLongCSV(Sheet,OutProcess,LogPath,AProgress,AMemo);
 
@@ -316,4 +335,3 @@ begin
 end;
 
 end.
-
