@@ -20,12 +20,12 @@ const
   COL_JOB_LAST      = 5;   // E
   COL_PART_FIRST    = 6;   // F
   COL_PART_LAST     = 9;   // I
-  COL_PROCESS_FIRST = 18;  // R
-  COL_PROCESS_LAST  = 75;  // BW
+  COL_PROCESS_FIRST = 20;  // T
+  COL_PROCESS_LAST  = 77;  // BY
 
-  COL_M             = 11;  // K
+  COL_M             = 13;  // M (PO.No.)
   COL_F             = 6;   // F
-  COL_O             = 13;  // M (StartDate)
+  COL_O             = 15;  // O (StartDate)
 
 {-------------------- Helpers --------------------}
 
@@ -66,15 +66,16 @@ begin
   end;
 end;
 
-function CsvLineFromRowCols(const Sheet: OleVariant; const Row: Integer; const ColIdx: array of Integer): string;
+// ฟังก์ชันสำหรับอ่านจาก Variant Array (ทำงานเร็วกว่าอ่านทีละ Cell)
+function CsvLineFromArrayCols(const DataArray: Variant; const Row: Integer; const ColIdx: array of Integer): string;
 var
   i: Integer;
-  V: OleVariant;
+  V: Variant;
 begin
   Result := '';
   for i := Low(ColIdx) to High(ColIdx) do
   begin
-    V := Sheet.Cells[Row, ColIdx[i]].Value;
+    V := DataArray[Row, ColIdx[i]];
     if i > Low(ColIdx) then
       Result := Result + ',';
     Result := Result + CsvEscape(VarToStr(V));
@@ -83,146 +84,177 @@ end;
 
 {-------------------- CSV Writers --------------------}
 
-// ✅ เพิ่ม Parameter "AppendRunNo" เพื่อเลือกว่าจะต่อท้ายเลข 4 หลักหรือไม่
-procedure SaveCSVWithCustomHeaderByCols(const SrcSheet: OleVariant;
-  const ColIndices: array of Integer; const Path: string;
-  const Title: string; const LogPath: string;
-  AProgress: TProgressBar; AMemo: TMemo;
-  const HeaderFields: TArray<string>;
-  AppendRunNo: Boolean = False);
+procedure SaveCSVJob(const DataArray: Variant; const MaxRow: Integer;
+  const Path, LogPath: string; AProgress: TProgressBar; AMemo: TMemo);
 var
   R: Integer;
   SL: TStringList;
-  Total, Done: Integer;
-  LastRow, StartRow, EndRow: Integer;
-  WroteDataCount: Integer;
-  RowData: string;
+  HeaderFields: TArray<string>;
+  LineData, SDate: string;
+  ExcelDate: Variant;
 begin
-  MemoStep(AMemo, 'Start ' + Title + ' → ' + Path);
+  MemoStep(AMemo, 'Start JOB → ' + Path);
   SL := TStringList.Create;
   try
+    // ✅ เปลี่ยน Mfg.No. เป็น PO.No.
+    HeaderFields := TArray<string>.Create('CstmrCD','Cstmr.Name','PO.No.','RE','ProductName','StartDate');
     SL.Add(CsvJoin(HeaderFields));
 
-    LastRow  := SrcSheet.UsedRange.Row + SrcSheet.UsedRange.Rows.Count - 1;
-    StartRow := 3;
-    EndRow   := LastRow;
-
-    if EndRow >= StartRow then
-      Total := 1 + (EndRow - StartRow + 1)
-    else
-      Total := 1;
-
-    Done := 0;
     if Assigned(AProgress) then
     begin
       AProgress.Position := 0;
-      AProgress.Max := Total;
+      AProgress.Max := MaxRow - 2; // เริ่มข้อมูลที่แถว 3
     end;
 
-    Inc(Done);
-    if Assigned(AProgress) then AProgress.Position := Done;
+    for R := 3 to MaxRow do
+    begin
+      // ดึงคอลัมน์ [1, 2, 13, 4, 5]
+      LineData := CsvLineFromArrayCols(DataArray, R, [1, 2, COL_M, 4, 5]);
 
-    WroteDataCount := 0;
-    if EndRow >= StartRow then
-      for R := StartRow to EndRow do
+      // ดึงวันที่จาก Column O มาคำนวณ +3 วัน ทันที (ไม่ต้องเขียนแล้วเปิดใหม่)
+      ExcelDate := DataArray[R, COL_O];
+      SDate := '';
+      if not VarIsNull(ExcelDate) and not VarIsEmpty(ExcelDate) then
       begin
-        // ดึงข้อมูลปกติมาก่อน
-        RowData := CsvLineFromRowCols(SrcSheet, R, ColIndices);
-
-        // ✅ ถ้าเปิดใช้งาน AppendRunNo (เช่น ไฟล์ PART) ให้คำนวณเลขใน RAM แล้วต่อท้ายเลย
-        if AppendRunNo then
-          RowData := RowData + ',' + CsvEscape(Format('%.4d', [R - StartRow + 1]));
-
-        SL.Add(RowData);
-        Inc(WroteDataCount);
-        Inc(Done);
-        if Assigned(AProgress) then AProgress.Position := Done;
-        if (R mod 50 = 0) then
-          MemoStep(AMemo, Format('%s processing row %d...', [Title, R]));
+        try
+          SDate := FormatDateTime('dd/mm/yyyy', IncDay(VarToDateTime(ExcelDate), 3));
+        except
+          SDate := '';
+        end;
       end;
+
+      SL.Add(LineData + ',' + CsvEscape(SDate));
+
+      if Assigned(AProgress) then AProgress.Position := R - 2;
+      if (R mod 1000 = 0) then
+        MemoStep(AMemo, Format('JOB processing row %d...', [R]));
+    end;
 
     ForceDirectories(ExtractFileDir(Path));
     SL.SaveToFile(Path, TEncoding.UTF8);
 
-    if Trim(LogPath) <> '' then
-      TFile.AppendAllText(LogPath,
-        Format('[%s] %s -> %s (header + %d rows)',
-          [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), Title, Path, WroteDataCount])
-        + sLineBreak, TEncoding.UTF8);
-
-    MemoStep(AMemo, Format('%s completed (%d rows written)', [Title, WroteDataCount]));
+    TFile.AppendAllText(LogPath, Format('[%s] JOB -> %s (header + %d rows)' + sLineBreak,
+      [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), Path, SL.Count - 1]), TEncoding.UTF8);
+    MemoStep(AMemo, Format('JOB completed (%d rows written)', [SL.Count - 1]));
   finally
     SL.Free;
   end;
 end;
 
-{-------------------- PROCESS --------------------}
-
-procedure SaveProcessAsLongCSV(const SrcSheet: OleVariant;
-  const Path: string; const LogPath: string; AProgress: TProgressBar; AMemo: TMemo);
+procedure SaveCSVPart(const DataArray: Variant; const MaxRow: Integer;
+  const Path, LogPath: string; AProgress: TProgressBar; AMemo: TMemo);
 var
+  R: Integer;
   SL: TStringList;
-  LastRow, StartRow, EndRow: Integer;
-  Total, Done, R: Integer;
-  MfgNo, PartFig, ProcName, SetVal, MaVal, RunVal: string;
-  FirstOnlyProcCol, TripletStartCol, TripletEndCol, MaxTriples, k: Integer;
+  HeaderFields: TArray<string>;
+begin
+  MemoStep(AMemo, 'Start PART → ' + Path);
+  SL := TStringList.Create;
+  try
+    // ✅ เปลี่ยน Mfg.No. เป็น PO.No.
+    HeaderFields := TArray<string>.Create('PO.No.','PartsName','Material','SizeRemarks','PartsQuantity');
+    SL.Add(CsvJoin(HeaderFields));
+
+    if Assigned(AProgress) then
+    begin
+      AProgress.Position := 0;
+      AProgress.Max := MaxRow - 2;
+    end;
+
+    for R := 3 to MaxRow do
+    begin
+      SL.Add(CsvLineFromArrayCols(DataArray, R, [COL_M, 6, 7, 8, 9]));
+
+      if Assigned(AProgress) then AProgress.Position := R - 2;
+      if (R mod 1000 = 0) then
+        MemoStep(AMemo, Format('PART processing row %d...', [R]));
+    end;
+
+    ForceDirectories(ExtractFileDir(Path));
+    SL.SaveToFile(Path, TEncoding.UTF8);
+
+    TFile.AppendAllText(LogPath, Format('[%s] PART -> %s (header + %d rows)' + sLineBreak,
+      [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), Path, SL.Count - 1]), TEncoding.UTF8);
+    MemoStep(AMemo, Format('PART completed (%d rows written)', [SL.Count - 1]));
+  finally
+    SL.Free;
+  end;
+end;
+
+procedure SaveCSVProcess(const DataArray: Variant; const MaxRow, MaxCol: Integer;
+  const Path, LogPath: string; AProgress: TProgressBar; AMemo: TMemo);
+var
+  R, k: Integer;
+  SL: TStringList;
+  PoNo, PartFig, ProcName, SetVal, MaVal: string;
+  TripletStartCol, TripletEndCol, MaxTriples: Integer;
   ProcCol, SetCol, MaCol: Integer;
 begin
   MemoStep(AMemo, 'Start PROCESS → ' + Path);
   SL := TStringList.Create;
   try
-    SL.Add(CsvJoin(TArray<string>.Create('Mfg.No.','Part figure','process','set','ma','RUNNO')));
-    LastRow := SrcSheet.UsedRange.Row + SrcSheet.UsedRange.Rows.Count - 1;
-    StartRow := 3; EndRow := LastRow;
-    FirstOnlyProcCol := COL_PROCESS_FIRST;
+    // ✅ เปลี่ยน Mfg.No. เป็น PO.No.
+    SL.Add(CsvJoin(TArray<string>.Create('PO.No.','Part figure','process','set','ma')));
+
     TripletStartCol  := COL_PROCESS_FIRST + 1;
     TripletEndCol    := COL_PROCESS_LAST;
-    if TripletEndCol >= TripletStartCol then
-      MaxTriples := (TripletEndCol - TripletStartCol + 1) div 3 else MaxTriples := 0;
+    if TripletEndCol <= MaxCol then
+      MaxTriples := (TripletEndCol - TripletStartCol + 1) div 3
+    else
+      MaxTriples := (MaxCol - TripletStartCol + 1) div 3;
 
-    if EndRow >= StartRow then
-      Total := 1 + (EndRow - StartRow + 1) * (1 + MaxTriples)
-    else Total := 1;
+    if MaxTriples < 0 then MaxTriples := 0;
 
-    Done := 0;
     if Assigned(AProgress) then
     begin
       AProgress.Position := 0;
-      AProgress.Max := Total;
+      AProgress.Max := MaxRow - 2;
     end;
 
-    Inc(Done);
-    if Assigned(AProgress) then AProgress.Position := Done;
-
-    for R := StartRow to EndRow do
+    for R := 3 to MaxRow do
     begin
-      MfgNo   := VarToStr(SrcSheet.Cells[R, COL_M].Value);
-      PartFig := VarToStr(SrcSheet.Cells[R, COL_F].Value);
+      PoNo    := VarToStr(DataArray[R, COL_M]);
+      PartFig := VarToStr(DataArray[R, COL_F]);
 
-      // ✅ คำนวณ RUNNO 4 หลักใน RAM ทันทีโดยอิงจากบรรทัด R
-      RunVal  := Format('%.4d', [R - StartRow + 1]);
-
-      ProcName := VarToStr(SrcSheet.Cells[R, FirstOnlyProcCol].Value);
-      if Trim(ProcName) <> '' then
-        SL.Add(CsvJoin(TArray<string>.Create(MfgNo, PartFig, ProcName, '0', '0', RunVal)));
-
-      for k := 0 to MaxTriples-1 do
+      // ตัวแรกสุด
+      if COL_PROCESS_FIRST <= MaxCol then
       begin
-        ProcCol := TripletStartCol + k*3;
+        ProcName := VarToStr(DataArray[R, COL_PROCESS_FIRST]);
+        if Trim(ProcName) <> '' then
+          SL.Add(CsvJoin(TArray<string>.Create(PoNo, PartFig, ProcName, '0', '0')));
+      end;
+
+      // ตัวที่เหลือเป็น Triplet
+      for k := 0 to MaxTriples - 1 do
+      begin
+        ProcCol := TripletStartCol + (k * 3);
         SetCol  := ProcCol + 1;
         MaCol   := ProcCol + 2;
-        ProcName := VarToStr(SrcSheet.Cells[R, ProcCol].Value);
-        SetVal := VarToStr(SrcSheet.Cells[R, SetCol].Value);
-        MaVal  := VarToStr(SrcSheet.Cells[R, MaCol].Value);
+
+        if MaCol > MaxCol then Break; // ป้องกัน index out of bounds
+
+        ProcName := VarToStr(DataArray[R, ProcCol]);
+        SetVal   := VarToStr(DataArray[R, SetCol]);
+        MaVal    := VarToStr(DataArray[R, MaCol]);
+
         if Trim(SetVal) = '' then SetVal := '0';
         if Trim(MaVal)  = '' then MaVal  := '0';
+
         if Trim(ProcName) <> '' then
-          SL.Add(CsvJoin(TArray<string>.Create(MfgNo, PartFig, ProcName, SetVal, MaVal, RunVal)));
+          SL.Add(CsvJoin(TArray<string>.Create(PoNo, PartFig, ProcName, SetVal, MaVal)));
       end;
+
+      if Assigned(AProgress) then AProgress.Position := R - 2;
+      if (R mod 1000 = 0) then
+        MemoStep(AMemo, Format('PROCESS processing row %d...', [R]));
     end;
 
+    ForceDirectories(ExtractFileDir(Path));
     SL.SaveToFile(Path, TEncoding.UTF8);
-    MemoStep(AMemo, Format('PROCESS completed (%d rows)', [SL.Count-1]));
+
+    TFile.AppendAllText(LogPath, Format('[%s] PROCESS -> %s (header + %d rows)' + sLineBreak,
+      [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), Path, SL.Count - 1]), TEncoding.UTF8);
+    MemoStep(AMemo, Format('PROCESS completed (%d rows)', [SL.Count - 1]));
   finally
     SL.Free;
   end;
@@ -237,94 +269,62 @@ var
   OutJob, OutPart, OutProcess: string;
   LogPath, LogDir: string;
   Excel, WB, Sheet: OleVariant;
-  HeaderJob, HeaderPart: TArray<string>;
-  SL: TStringList;
-  i: Integer;
-  ExcelDate: Variant;
-  SDate: string;
+  DataArray: Variant;
+  MaxRow, MaxCol: Integer;
 begin
-  HeaderJob := TArray<string>.Create('CstmrCD','Cstmr.Name','Mfg.No.','RE','ProductName');
-  // เพิ่ม RUNNO ท้าย Header สำหรับ PART
-  HeaderPart := TArray<string>.Create('Mfg.No.','PartsName','Material','SizeRemarks','PartsQuantity','RUNNO');
-
   Ini := TMemIniFile.Create(IniPath, TEncoding.UTF8);
   try
     InputFile := Ini.ReadString('Input','File','');
+    SheetName := 'ピックアップ';
     OutJob := Ini.ReadString('Output1','Path','');
     OutPart := Ini.ReadString('Output2','Path','');
     OutProcess := Ini.ReadString('Output3','Path','');
     LogPath := Ini.ReadString('Options','LogPath','');
     if Trim(LogPath)='' then
     begin
-      LogDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0)))+'LOG\';
+      LogDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'LOG\';
       if not TDirectory.Exists(LogDir) then TDirectory.CreateDirectory(LogDir);
-      LogPath := TPath.Combine(LogDir,'export_log_'+FormatDateTime('yyyymmdd',Now)+'.txt');
+      LogPath := TPath.Combine(LogDir, 'export_log_' + FormatDateTime('yyyymmdd', Now) + '.txt');
     end;
   finally
     Ini.Free;
   end;
 
   if not FileExists(InputFile) then
-    raise Exception.CreateFmt('Input file not found: %s',[InputFile]);
+    raise Exception.CreateFmt('Input file not found: %s', [InputFile]);
 
   CoInitialize(nil);
   try
+    MemoStep(AMemo, 'Starting Excel Application...');
     Excel := CreateOleObject('Excel.Application');
     Excel.Visible := False;
+
+    // ป้องกัน Popup กวนใจและช่วยให้ประมวลผลเร็วขึ้น
     Excel.DisplayAlerts := False;
-    WB := Excel.Workbooks.Open(InputFile);
+    Excel.ScreenUpdating := False;
+
+    WB := Excel.Workbooks.Open(InputFile, False, True); // เปิดแบบ Read-Only
     try
-      Sheet := WB.Worksheets[1];
-      SheetName := Sheet.Name;
+      Sheet := WB.Worksheets[SheetName];
+      MemoStep(AMemo, 'Reading all data from sheet: ' + SheetName + ' into memory (fast mode)...');
 
-      MemoStep(AMemo,'Using 1st Sheet: '+SheetName);
+      // ✅ ดึงข้อมูลเข้า RAM รวดเดียวด้วย Variant Array
+      DataArray := Sheet.UsedRange.Value;
+      MaxRow := VarArrayHighBound(DataArray, 1);
+      MaxCol := VarArrayHighBound(DataArray, 2);
 
-      // ❌ ตัดส่วนที่เขียนลง Excel (Column CA) ทิ้งไปเลย โปรแกรมจะเร็วขึ้นและไม่พัง!
+      MemoStep(AMemo, Format('Data loaded. Total Rows: %d, Total Cols: %d', [MaxRow, MaxCol]));
 
-      // ===== JOB (ไม่มีการต่อท้าย RUNNO) =====
-      if OutJob <> '' then
+      if MaxRow >= 3 then
       begin
-        // ส่งค่า False ไว้ท้ายสุดเพื่อบอกว่าไม่ต้องรัน RUNNO
-        SaveCSVWithCustomHeaderByCols(Sheet, [1,2,COL_M,4,5], OutJob, 'JOB', LogPath, AProgress, AMemo, HeaderJob, False);
+        if OutJob <> '' then SaveCSVJob(DataArray, MaxRow, OutJob, LogPath, AProgress, AMemo);
+        if OutPart <> '' then SaveCSVPart(DataArray, MaxRow, OutPart, LogPath, AProgress, AMemo);
+        if OutProcess <> '' then SaveCSVProcess(DataArray, MaxRow, MaxCol, OutProcess, LogPath, AProgress, AMemo);
+      end
+      else
+        MemoStep(AMemo, 'Not enough data rows to process.');
 
-        SL := TStringList.Create;
-        try
-          SL.LoadFromFile(OutJob,TEncoding.UTF8);
-          if SL.Count>0 then
-          begin
-            SL[0] := SL[0]+',StartDate';
-            for i:=1 to SL.Count-1 do
-            begin
-              ExcelDate := Sheet.Cells[i+2,COL_O].Value; // Column O
-              if not VarIsNull(ExcelDate) and not VarIsEmpty(ExcelDate) then
-              begin
-                try
-                  SDate := FormatDateTime('dd/mm/yyyy',IncDay(VarToDateTime(ExcelDate),3));
-                except
-                  SDate := '';
-                end;
-              end
-              else
-                SDate := '';
-              SL[i] := SL[i]+','+SDate;
-            end;
-          end;
-          SL.SaveToFile(OutJob,TEncoding.UTF8);
-        finally
-          SL.Free;
-        end;
-        MemoStep(AMemo,'Added StartDate (column M +3 days) to JOB file');
-      end;
-
-      // ===== PART (สั่งให้เติม RUNNO ต่อท้ายด้วยการส่ง True) =====
-      if OutPart <> '' then
-        SaveCSVWithCustomHeaderByCols(Sheet, [COL_M,6,7,8,9], OutPart, 'PART', LogPath, AProgress, AMemo, HeaderPart, True);
-
-      // ===== PROCESS (คำนวณ RUNNO ใน RAM ในฟังก์ชันเลย) =====
-      if OutProcess <> '' then
-        SaveProcessAsLongCSV(Sheet,OutProcess,LogPath,AProgress,AMemo);
-
-      MemoStep(AMemo,'Export completed successfully.');
+      MemoStep(AMemo, 'Export completed successfully.');
     finally
       WB.Close(False);
       Excel.Quit;
