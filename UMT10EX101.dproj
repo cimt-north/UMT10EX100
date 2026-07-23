@@ -4,7 +4,7 @@
         <ProjectVersion>20.3</ProjectVersion>
         <FrameworkType>VCL</FrameworkType>
         <Base>True</Base>
-        <Config Condition="'$(Config)'==''">Debug</Config>
+        <Config Condition="'$(Config)'==''">Release</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <ProjectName Condition="'$(ProjectName)'==''">UMT10EX101</ProjectName>
         <TargetedPlatforms>3</TargetedPlatforms>
@@ -77,16 +77,17 @@
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
         <BT_BuildType>Debug</BT_BuildType>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.1.11.2025;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=10.2607.23.1;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
-        <VerInfo_MinorVer>1</VerInfo_MinorVer>
-        <VerInfo_Release>11</VerInfo_Release>
-        <VerInfo_Build>2025</VerInfo_Build>
+        <VerInfo_MinorVer>2607</VerInfo_MinorVer>
+        <VerInfo_Release>23</VerInfo_Release>
+        <VerInfo_Build>1</VerInfo_Build>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
         <Icon_MainIcon>UMT10EX101_Icon.ico</Icon_MainIcon>
-        <UWP_DelphiLogo44>C:\LITE_V2\Icon\GPR1100.exe.ico</UWP_DelphiLogo44>
-        <UWP_DelphiLogo150>C:\LITE_V2\Icon\GPR1100.exe.ico</UWP_DelphiLogo150>
+        <UWP_DelphiLogo44>C:\delphi\drkotei_program_icon\drkotei_program_icon\drkotei_program_icon-10.ico</UWP_DelphiLogo44>
+        <UWP_DelphiLogo150>C:\delphi\drkotei_program_icon\drkotei_program_icon\drkotei_program_icon-10.ico</UWP_DelphiLogo150>
+        <VerInfo_MajorVer>10</VerInfo_MajorVer>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
         <DCC_UsePackage>vclwinx;fmx;vclie;DbxCommonDriver;bindengine;IndyIPCommon;VCLRESTComponents;FireDACCommonODBC;FireDACCommonDriver;appanalytics;IndyProtocols;vclx;IndyIPClient;dbxcds;vcledge;bindcompvclwinx;FmxTeeUI;bindcompfmx;inetdb;ibmonitor;FireDACSqliteDriver;DbxClientDriver;Tee;soapmidas;vclactnband;TeeUI;fmxFireDAC;dbexpress;DBXMySQLDriver;VclSmp;inet;vcltouch;fmxase;dbrtl;fmxdae;TeeDB;FireDACMSAccDriver;CustomIPTransport;vcldsnap;DBXInterBaseDriver;IndySystem;Skia.Package.VCL;vcldb;ibxbindings;vclFireDAC;bindcomp;FireDACCommon;inetstn;IndyCore;RESTBackendComponents;bindcompdbx;rtl;FireDACMySQLDriver;FireDACADSDriver;RESTComponents;DBXSqliteDriver;vcl;IndyIPServer;dsnapxml;dsnapcon;adortl;vclimg;FireDACPgDriver;FireDAC;inetdbxpress;xmlrtl;tethering;ibxpress;bindcompvcl;dsnap;CloudService;vclib;fmxobj;bindcompvclsmp;FMXTee;soaprtl;soapserver;FireDACIBDriver;$(DCC_UsePackage)</DCC_UsePackage>
@@ -112,11 +113,15 @@
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_MinorVer>1</VerInfo_MinorVer>
-        <VerInfo_Release>11</VerInfo_Release>
-        <VerInfo_Build>2025</VerInfo_Build>
+        <VerInfo_MinorVer>2607</VerInfo_MinorVer>
+        <VerInfo_Release>22</VerInfo_Release>
+        <VerInfo_Build>1</VerInfo_Build>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <Icon_MainIcon>UMT10EX101_Icon.ico</Icon_MainIcon>
+        <Icon_MainIcon>UMT10EX101_Icon1.ico</Icon_MainIcon>
+        <UWP_DelphiLogo44>C:\delphi\drkotei_program_icon\drkotei_program_icon\drkotei_program_icon-10.ico</UWP_DelphiLogo44>
+        <UWP_DelphiLogo150>C:\delphi\drkotei_program_icon\drkotei_program_icon\drkotei_program_icon-10.ico</UWP_DelphiLogo150>
+        <VerInfo_MajorVer>10</VerInfo_MajorVer>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=10.2607.22.1;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
@@ -137,6 +142,8 @@
         <VerInfo_Build>2025</VerInfo_Build>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <Icon_MainIcon>UMT10EX101_Icon.ico</Icon_MainIcon>
+        <VerInfo_MajorVer>10</VerInfo_MajorVer>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=10.1.11.2025;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
@@ -175,12 +182,12 @@
                     <Source Name="MainSource">UMT10EX101.dpr</Source>
                 </Source>
                 <Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k290.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp290.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k370.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp370.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="5">
-                <DeployFile LocalName="C:\LITE_V2\Icon\GPR1100.exe.ico" Configuration="Debug" Class="UWP_DelphiLogo44">
+                <DeployFile LocalName="C:\delphi\drkotei_program_icon\drkotei_program_icon\drkotei_program_icon-10.ico" Configuration="Debug" Class="UWP_DelphiLogo44">
                     <Platform Name="Win32">
                         <RemoteDir>Assets\</RemoteDir>
                         <RemoteName>Logo44x44.png</RemoteName>
